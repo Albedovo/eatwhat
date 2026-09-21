@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EATWHAT CLI</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #000;
+      color: #fff;
+      font: 16px/1.5 "Courier New", Courier, monospace;
+    }
+    main { width: min(920px, calc(100% - 40px)); margin: 0 auto; padding: 46px 0 68px; }
+    .terminal { border: 1px solid #fff; min-height: 560px; padding: 22px 24px; box-shadow: 8px 8px 0 #222; }
+    .bar { display: flex; justify-content: space-between; border-bottom: 1px solid #fff; padding-bottom: 14px; margin-bottom: 20px; }
+    .dim { opacity: .7; }
+    .output { white-space: pre-wrap; min-height: 400px; }
+    .line { margin: 0 0 12px; }
+    .prompt { display: flex; gap: 9px; align-items: center; }
+    .prompt span { white-space: nowrap; }
+    input {
+      flex: 1; min-width: 0; border: 0; outline: 0; padding: 0;
+      background: transparent; color: #fff; font: inherit; caret-color: #fff;
+    }
+    .cursor { display: inline-block; width: 9px; height: 18px; background: #fff; vertical-align: -3px; animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .help { margin-top: 30px; border-top: 1px solid #fff; padding-top: 18px; }
+    .help h2 { margin: 0 0 12px; font-size: 1em; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .columns p { margin: 0; white-space: pre-wrap; }
+    kbd { border: 1px solid #fff; padding: 0 4px; font: inherit; }
+    @media (max-width: 650px) { body { font-size: 14px; } main { width: min(100% - 24px, 920px); padding-top: 16px; } .terminal { padding: 16px; } .columns { grid-template-columns: 1fr; gap: 12px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="terminal" aria-label="EATWHAT command line interface">
+      <header class="bar"><span>EATWHAT v1.0</span><span class="dim">food indecision, weaponized</span></header>
+      <div class="output" id="output" aria-live="polite"><p class="line">Welcome to EATWHAT.</p><p class="line">Type <kbd>help</kbd> to view commands, or <kbd>decide</kbd> to let a computer judge your lunch.</p></div>
+      <label class="prompt"><span>$ eatwhat</span><input id="command" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Enter a command"><span class="cursor" aria-hidden="true"></span></label>
+    </section>
+
+    <section class="help" aria-label="Command reference">
+      <h2>QUICK REFERENCE</h2>
+      <div class="columns">
+        <p>COMMANDS
+  decide              get a food recommendation
+  yes / no            accept, or reject for another choice
+  continue            continue after the refusal warning
+  rate &lt;food&gt;         judge a specific food
+  history             show recent suggestions
+  reset               clear this session
+  help                display this help screen
+  quit                exit EATWHAT</p>
+        <p>DECIDE FLAGS
+  --mood &lt;value&gt;      hungry | tired | sad | adventurous
+  --budget &lt;value&gt;    cheap | normal | treat
+  --time &lt;value&gt;      quick | normal | slow
+  --avoid &lt;food&gt;      exclude a food/category
+  --vegetarian        vegetarian suggestions only
+  --chaos             let chaos choose
+  --quiet             skip commentary</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const output = document.querySelector('#output');
+    const input = document.querySelector('#command');
+    const foods = [
+      { name: 'DUMPLINGS', ingredients: 'pork, chive, ginger, wrapper', calories: 420 },
+      { name: 'RAMEN', ingredients: 'noodles, pork broth, egg, scallion', calories: 760 },
+      { name: 'LEFTOVERS', ingredients: 'mystery, optimism, yesterday', calories: 510 },
+      { name: 'FRIED CHICKEN', ingredients: 'chicken, flour, oil, denial', calories: 920 },
+      { name: 'SALAD', ingredients: 'greens, tomato, cucumber, dressing', calories: 310 },
+      { name: 'BUBBLE TEA', ingredients: 'tea, milk, sugar, tapioca', calories: 540 },
+      { name: 'HOT POT', ingredients: 'broth, beef, tofu, vegetables, sauce', calories: 890 },
+      { name: 'BEEF NOODLE SOUP', ingredients: 'beef, wheat noodles, broth, bok choy', calories: 680 },
+      { name: 'KIMCHI FRIED RICE', ingredients: 'rice, kimchi, egg, sesame oil', calories: 630 },
+      { name: 'BIBIMBAP', ingredients: 'rice, vegetables, egg, gochujang', calories: 650 },
+      { name: 'SUSHI', ingredients: 'rice, fish, seaweed, soy sauce', calories: 540 },
+      { name: 'PHO', ingredients: 'rice noodles, beef, herbs, broth', calories: 590 },
+      { name: 'THAI BASIL CHICKEN', ingredients: 'chicken, basil, chili, rice', calories: 710 },
+      { name: 'MAPO TOFU', ingredients: 'tofu, pork, chili bean paste, peppercorn', calories: 580 },
+      { name: 'CHOW MEIN', ingredients: 'egg noodles, vegetables, soy sauce', calories: 720 },
+      { name: 'CONGEE', ingredients: 'rice, broth, ginger, scallion', calories: 360 },
+      { name: 'PIZZA', ingredients: 'dough, tomato, mozzarella, confidence', calories: 980 },
+      { name: 'BURGER AND FRIES', ingredients: 'beef, bun, cheese, potato, salt', calories: 1120 },
+      { name: 'TACOS', ingredients: 'tortilla, meat, onion, cilantro, lime', calories: 670 },
+      { name: 'SHAKSHUKA', ingredients: 'egg, tomato, pepper, bread', calories: 520 },
+      { name: 'GRILLED CHEESE', ingredients: 'bread, butter, cheese', calories: 610 },
+      { name: 'SPAGHETTI AGLIO E OLIO', ingredients: 'pasta, garlic, olive oil, chili', calories: 700 },
+      { name: 'CHICKEN CAESAR WRAP', ingredients: 'chicken, lettuce, parmesan, tortilla', calories: 640 },
+      { name: 'AVOCADO TOAST', ingredients: 'bread, avocado, lemon, chili flakes', calories: 430 },
+      { name: 'INSTANT NOODLES', ingredients: 'noodles, sodium, questionable seasoning', calories: 510 },
+      { name: 'PEANUT BUTTER TOAST', ingredients: 'bread, peanut butter, stubbornness', calories: 450 },
+      { name: 'CEREAL FOR DINNER', ingredients: 'cereal, milk, a loose interpretation of dinner', calories: 390 },
+      { name: 'ICE CREAM', ingredients: 'cream, sugar, emotional weather', calories: 560 },
+      { name: 'CHICKEN TERIYAKI RICE BOWL', ingredients: 'chicken, soy sauce, rice, broccoli', calories: 740 },
+      { name: 'TOM YUM NOODLES', ingredients: 'rice noodles, shrimp, lime, chili, broth', calories: 570 },
+      { name: 'XIAOLONGBAO', ingredients: 'pork, soup, ginger, wrapper', calories: 460 },
+      { name: 'LO MEIN', ingredients: 'egg noodles, vegetables, soy sauce, sesame oil', calories: 690 },
+      { name: 'JAPANESE CURRY', ingredients: 'rice, curry roux, potato, carrot, chicken', calories: 780 },
+      { name: 'MISO SALMON', ingredients: 'salmon, miso, rice, greens', calories: 620 },
+      { name: 'CHICKEN TIKKA MASALA', ingredients: 'chicken, tomato, cream, spices, rice', calories: 850 },
+      { name: 'FALAFEL PITA', ingredients: 'chickpea fritters, pita, tahini, salad', calories: 640 },
+      { name: 'MAC AND CHEESE', ingredients: 'pasta, cheddar, butter, regret', calories: 900 },
+      { name: 'TUNA MELT', ingredients: 'tuna, cheese, bread, mayonnaise', calories: 580 },
+      { name: 'EGG FRIED RICE', ingredients: 'rice, egg, scallion, soy sauce', calories: 590 },
+      { name: 'NEW YORK PIZZA SLICE', ingredients: 'thin crust, tomato, mozzarella, grease', calories: 630 },
+      { name: 'BACON EGG AND CHEESE', ingredients: 'bacon, egg, cheese, roll', calories: 690 },
+      { name: 'BAGEL WITH LOX', ingredients: 'bagel, smoked salmon, cream cheese, capers', calories: 610 },
+      { name: 'CHOPPED CHEESE', ingredients: 'beef, cheese, onions, hero roll', calories: 880 },
+      { name: 'HALAL CART CHICKEN RICE', ingredients: 'spiced chicken, rice, lettuce, white sauce', calories: 980 },
+      { name: 'PASTRAMI ON RYE', ingredients: 'pastrami, rye bread, mustard, pickles', calories: 760 },
+      { name: 'NEW YORK HOT DOG', ingredients: 'hot dog, bun, mustard, sauerkraut', calories: 510 },
+      { name: 'REUBEN SANDWICH', ingredients: 'corned beef, rye, swiss, sauerkraut', calories: 840 },
+      { name: 'CHEESECAKE', ingredients: 'cream cheese, sugar, crust, commitment', calories: 720 },
+      { name: 'DOLLAR SLICE AND SODA', ingredients: 'pizza, carbonation, financial realism', calories: 730 }
+    ];
+    const praise = [
+      'Actually excellent. Do not overthink a rare competent idea.',
+      'This has flavor, texture, and a reason to exist. Unlike some meetings.',
+      'A dependable choice. Your future self may briefly respect you.',
+      'This is the kind of meal that makes a day slightly less embarrassing.',
+      'Good choice. Even the algorithm is mildly impressed.',
+      'Balanced enough to sound responsible, tasty enough to be honest.',
+      'You could do much worse. You usually do, but you could.',
+      'This might genuinely solve the hunger problem. Revolutionary.'
+    ];
+    const roast = [
+      'Bold. Not good, necessarily—just bold.',
+      'This is less a meal and more a public announcement that you gave up.',
+      'Your stomach deserves better, but apparently it does not get a vote.',
+      'A fascinating decision if your goal is to feel hungry again immediately.',
+      'This meal has the energy of replying “sounds good” to a plan you hate.',
+      'Nutrition has left the chat. It did not leave a forwarding address.',
+      'You are allowed to eat this. Society cannot stop you. That is the problem.',
+      'Technically food. Emotionally, a cry for help.',
+      'This is what happens when convenience wins the custody battle.',
+      'A choice made by someone staring into a fridge at 1:13 AM.',
+      'Crunchy proof that consequences are a future-you problem.',
+      'A beverage cosplaying as a meal. Bold strategy.',
+      'Not glamorous, but neither is being hungry at 11:47 PM.',
+      'Very responsible. Who are you trying to impress?'
+    ];
+    const lateStageRemarks = [
+      'Decision attempt {n}. You have now turned lunch into an endurance sport.',
+      'Decision attempt {n}. The foods are starting to take this personally.',
+      'Decision attempt {n}. A normal person would be eating by now. Just context.',
+      'Decision attempt {n}. No meal can compete with the imaginary perfect meal in your head.',
+      'Decision attempt {n}. The algorithm has run out of ways to pretend this is productive.',
+      'Decision attempt {n}. Your stomach filed a complaint. It was denied for lack of a decision.',
+      'Decision attempt {n}. You are one more “no” away from reviewing the menu spiritually.',
+      'Decision attempt {n}. Even the pizza slice has stopped trying to impress you.'
+    ];
+    let current = null, rejections = 0, history = [], waitingForContinue = false;
+    let isThinking = false, skipThinking = false, finishThinkingWait = null;
+    const print = text => { const p = document.createElement('p'); p.className = 'line'; p.textContent = text; output.append(p); };
+    const randomItem = list => list[Math.floor(Math.random() * list.length)];
+    const patienceComment = () => {
+      if (rejections === 0) return 'First decision of the session. Try not to make this difficult.';
+      if (rejections < 3) return `Decision attempt ${rejections + 1}. You are still allowed to change your mind.`;
+      if (rejections < 5) return `Decision attempt ${rejections + 1}. Remarkable commitment to not deciding.`;
+      if (rejections < 8) return `Decision attempt ${rejections + 1}. The menu is not going to become emotionally clearer.`;
+      if (rejections < 10) return `Decision attempt ${rejections + 1}. EATWHAT is now doing more work than you are.`;
+      return randomItem(lateStageRemarks).replace('{n}', rejections + 1);
+    };
+    const suggest = () => {
+      current = randomItem(foods);
+      const comment = Math.random() < .52 ? randomItem(praise) : randomItem(roast);
+      history.push(current.name);
+      print(`Suggestion: ${current.name}\nMain ingredients: ${current.ingredients}\nEstimated calories: ~${current.calories} kcal\nComment: “${comment}”\n${patienceComment()}\n\nDo you want to eat ${current.name.toLowerCase()}? [yes/no]`);
+    };
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const waitForThought = ms => new Promise(resolve => {
+      const timer = setTimeout(() => { finishThinkingWait = null; resolve(); }, ms);
+      finishThinkingWait = () => { clearTimeout(timer); finishThinkingWait = null; resolve(); };
+    });
+    const overthink = async () => {
+      const thoughts = [
+        'Wait. Is the first idea bad, or did you just reject it first?',
+        'Reviewing the evidence: you are hungry.',
+        'Counterpoint: you have also made hunger your entire personality today.',
+        'Considering noodles.',
+        'Noodles were already considered. You said no.',
+        'Checking the fridge for a sign from the universe.',
+        'The universe has declined to comment.',
+        'Returning to the original task: choose one edible thing.'
+      ];
+      isThinking = true; skipThinking = false;
+      print(`OVERTHINKING MODE ACTIVATED — REJECTION ${rejections}.\nPress Enter to skip the performance.`);
+      for (const thought of thoughts) {
+        print(`thinking> ${thought}`);
+        await waitForThought(520 + thought.length * 9);
+        if (skipThinking) break;
+      }
+      if (skipThinking) print('thinking> Fine. Skipping to the part where you still have to eat.');
+      else print('thinking> Conclusion reached with unreasonable confidence.');
+      isThinking = false; skipThinking = false; finishThinkingWait = null;
+      await wait(350); suggest();
+    };
+    const refusalWall = () => {
+      waitingForContinue = true;
+      print('TEN REJECTIONS RECORDED.\n\nFine. Do not eat, then. You have rejected ten perfectly edible answers and somehow turned lunch into a personal crisis. The food is not going to arrive with a certificate proving it is The One. It is food. It will be warm, or crunchy, or mildly disappointing, and then the day will continue.\n\nType continue to keep choosing, or quit to accept that hunger has won.');
+    };
+    const eighthRejection = async () => {
+      print('EIGHT REJECTIONS RECORDED.\n\nAt this point, you are not choosing food. You are waiting for a bowl of noodles to solve your entire life. It cannot. It is noodles.\n\nGenerating another answer because apparently we live here now...');
+      await wait(800); suggest();
+    };
+    const help = () => print('EATWHAT — a food decision assistant with opinions\n\nUSAGE\n  eatwhat <command> [options]\n\nCOMMANDS\n  decide             Get a food recommendation and face your feelings\n  rate <food>        Ask for a judgment on a specific food\n  yes / no           Accept, or reject for another recommendation\n  continue           Continue after the refusal warning\n  history            View recent recommendations\n  reset              Forget this entire embarrassing session\n  help               Show command help\n  quit               Leave with your appetite unresolved\n\nTry: decide --mood tired --budget cheap');
+    input.addEventListener('keydown', async e => {
+      if (isThinking && e.key === 'Enter') {
+        e.preventDefault(); input.value = ''; skipThinking = true;
+        if (finishThinkingWait) finishThinkingWait();
+        return;
+      }
+      if (e.key !== 'Enter') return;
+      const raw = input.value.trim(); const [cmd, ...args] = raw.toLowerCase().split(/\s+/);
+      if (!raw) return; print(`$ eatwhat ${raw}`); input.value = '';
+      if (waitingForContinue && cmd !== 'continue' && cmd !== 'quit' && cmd !== 'exit') {
+        print('Choose continue or quit. Even this is a decision.');
+      }
+      else if (cmd === 'help') help();
+      else if (cmd === 'decide') suggest();
+      else if (cmd === 'continue') { waitingForContinue = false; print('You chose to continue. Of course you did.'); suggest(); }
+      else if (cmd === 'yes') { current ? (print(`Decision recorded: ${current.name}\nAn unexpectedly mature choice. Enjoy.`), current = null, rejections = 0) : print('There is nothing to accept. Try: decide'); }
+      else if (cmd === 'no') {
+        if (!current) print('There is nothing to reject. Try: decide');
+        else {
+          current = null; rejections++;
+          if (rejections === 5) await overthink();
+          else if (rejections === 8) await eighthRejection();
+          else if (rejections === 10) refusalWall();
+          else if (rejections > 10 && Math.random() < .35) await overthink();
+          else { print('Rejected. The food has been notified. Generating the next answer...'); await wait(350); suggest(); }
+        }
+      }
+      else if (cmd === 'rate') print(args.length ? `${args.join(' ').toUpperCase()}: “A risky choice, but you seem committed.”` : 'Usage: rate <food>');
+      else if (cmd === 'history') print(history.length ? `Recent suggestions: ${history.join(', ')}` : 'No suggestions yet. The void is still deciding.');
+      else if (cmd === 'reset') { current = null; rejections = 0; history = []; waitingForContinue = false; print('Session reset. Your indecision has been wiped clean.'); }
+      else if (cmd === 'quit' || cmd === 'exit') print('Goodbye. Eat something eventually.');
+      else print(`Command not found: ${cmd}\nType help for available commands.`);
+    });
+    document.addEventListener('click', () => input.focus());
+    input.focus();
+  </script>
+</body>
+</html>
